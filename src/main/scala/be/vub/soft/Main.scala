@@ -24,7 +24,7 @@ object Main {
             General options
          */
         val short           = false // Debugging, true -> only message type, false -> complete message
-        val iterations      = 3
+        val iterations      = 2
 
         /*
             Modifiable options
