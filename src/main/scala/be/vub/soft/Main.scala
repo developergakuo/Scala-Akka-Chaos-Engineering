@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 import java.util.Base64
 
+import be.vub.soft.tracer.{PerturbationDelay, PerturbationDrop, PerturbationKill, TestReport}
 import org.apache.commons.io.FileUtils
 
 import scala.io.Source
@@ -23,13 +24,13 @@ object Main {
             General options
          */
         val short           = false // Debugging, true -> only message type, false -> complete message
-        val iterations      = 1
+        val iterations      = 3
 
         /*
             Modifiable options
          */
         val target          = "/Users/jonas/Downloads/webShop"
-        val config          = Paths.get(target, "configuration.json").toAbsolutePath.toString
+        val config          = Paths.get(target, "perturbation.json").toAbsolutePath.toString
         val testClasses     = Paths.get(target, "target", "scala-2.12", "test-classes").toAbsolutePath.toString
 
         /*
@@ -149,6 +150,45 @@ object Main {
             } else {
                 println(s"No files generated. Probably, something went wrong.")
             }
+
+            import scala.collection.JavaConverters._
+            val reportFiles = FileUtils.listFiles(report, Array("bin"), false).asScala.toList
+            val reports = reportFiles.map(r => be.vub.soft.tracer.Tracer.read(r.getAbsolutePath))
+
+            val groupedByTests: Map[String, Map[String, List[TestReport]]] = reports.groupBy(r => r.suite).map({ case (ste, l) => ste -> l.groupBy(t => t.test)})
+
+            def toTrueOrFalse(b: Boolean): String = if(b) "T" else "F"
+
+            groupedByTests.foreach({
+                case (suite, reps) =>
+                    println(suite)
+                    reps.foreach({
+                        case (test, rprts) =>
+                            val iterations = rprts.zipWithIndex.map({ case (_, i) => i}).mkString("\t")
+                            val results = rprts.map(r => {
+                                val killed = toTrueOrFalse(r.trace.exists({
+                                    case _: PerturbationKill => true
+                                    case _ => false
+                                }))
+
+                                val dropped = toTrueOrFalse(r.trace.exists({
+                                    case _: PerturbationDrop => true
+                                    case _ => false
+                                }))
+
+                                val delayed = toTrueOrFalse(r.trace.exists({
+                                    case _: PerturbationDelay => true
+                                    case _ => false
+                                }))
+
+                                s"${r.success} ($delayed, $dropped, $killed)"
+                            }).mkString("\t")
+
+                            println(s"\t$test")
+                            println(s"\t$iterations")
+                            println(s"\t$results")
+                    })
+            })
 
         } else {
             println("Unable to discover tests")
