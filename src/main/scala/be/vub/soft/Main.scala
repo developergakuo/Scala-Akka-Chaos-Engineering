@@ -12,9 +12,12 @@ import scala.io.Source
 import scala.sys.process.{Process, ProcessLogger}
 
 /*
+    Idea: eg trading system/webserver/ecommerce starts many actors, but tests only use a part of them -> optimize by only killing those
 
     Potential bugs this tool should detect:
         https://doc.akka.io/docs/akka/current/actors.html#initialization-via-message-passing
+        https://doc.akka.io/docs/akka/2.5/general/message-delivery-reliability.html
+        https://github.com/royrusso/akka-java-examples
  */
 object Main {
 
@@ -29,7 +32,7 @@ object Main {
         /*
             Modifiable options
          */
-        val target          = "/Users/jonas/Downloads/webShop"
+        val target          = "/Users/jonas/phd/AkkaStreams" // "/Users/jonas/Downloads/webShop"
         val config          = Paths.get(target, "perturbation.json").toAbsolutePath.toString
         val testClasses     = Paths.get(target, "target", "scala-2.12", "test-classes").toAbsolutePath.toString
 
