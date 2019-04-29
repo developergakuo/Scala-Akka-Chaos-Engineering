@@ -74,6 +74,15 @@ object Main {
         FileUtils.copyDirectory(jars, lib)
 
         /*
+            Create output folder
+         */
+
+        val outputFile = new File(output)
+        if(!outputFile.exists()) {
+            outputFile.mkdirs()
+        }
+
+        /*
             Modify plugins.sbt
          */
 
