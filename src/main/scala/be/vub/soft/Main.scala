@@ -32,7 +32,7 @@ object Main {
         /*
             Modifiable options
          */
-        val target          = "/Users/jonas/phd/AkkaStreams" // "/Users/jonas/Downloads/webShop"
+        val target          = "/Users/jonas/Downloads/webShop" // "/Users/jonas/phd/AkkaStreams" //
         val config          = Paths.get(target, "perturbation.json").toAbsolutePath.toString
         val testClasses     = Paths.get(target, "target", "scala-2.12", "test-classes").toAbsolutePath.toString
 
