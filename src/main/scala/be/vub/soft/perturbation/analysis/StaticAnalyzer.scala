@@ -6,19 +6,19 @@ import be.vub.soft.tracer.{PerturbationDelay, PerturbationDrop, PerturbationKill
 import org.apache.commons.io.FileUtils
 
 class StaticAnalyzer(configurationPath: String, output: String) extends Analyzer {
-    override def next(): ActorConfig = {
+    override def next(): Option[ActorConfig] = {
         val result = JSONParser.load(configurationPath)
 
         println(result.head)
 
-        result.head
+        Some(result.head)
     }
 
     override def update(n: Int, config: ActorConfig): Unit = {
 
     }
 
-    override def report(): Unit = {
+    override def summary(): Unit = {
         val report = new File(output)
 
         if(report.exists()) {

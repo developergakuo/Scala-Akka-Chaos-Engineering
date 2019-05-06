@@ -4,8 +4,8 @@ import be.vub.soft.parser.ActorConfig
 
 abstract class Analyzer {
 
-    def next(): ActorConfig
+    def next(): Option[ActorConfig]
     def update(n: Int, config: ActorConfig): Unit
-    def report(): Unit
+    def summary(): Unit
 
 }

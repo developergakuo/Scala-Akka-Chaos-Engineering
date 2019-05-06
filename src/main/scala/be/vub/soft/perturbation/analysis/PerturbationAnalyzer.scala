@@ -3,28 +3,60 @@ package be.vub.soft.perturbation.analysis
 import java.nio.file.Paths
 
 import be.vub.soft.parser.ActorConfig
+import be.vub.soft.perturbation.criteria.{Criteria, EarliestCreatedActor}
+import be.vub.soft.perturbation.perturbations.Perturbation
 import be.vub.soft.tracer.TestReport
 
-case class PerturbationReport(config: ActorConfig, succeeds: Boolean = false)
+case class PerturbationReport(config: ActorConfig, report: TestReport)
 
 class PerturbationAnalyzer(suite: String, test: String, output: String) extends Analyzer {
 
     var results: Map[Int, PerturbationReport] = Map.empty
+    var report: Option[TestReport] = None
+    var perturbations: List[ActorConfig] = List(ActorConfig())
 
-    def next(): ActorConfig = {
-        // Decide next perturbation
+    def next(): Option[ActorConfig] = {
+        val head = perturbations.headOption
 
+        if(head.isDefined) {
+            perturbations = perturbations.tail
 
-        ActorConfig()
+            println(s"Next perturbation:\n$head")
+        }
+
+        head
+    }
+
+    private def compute(): Unit = {
+        val p = if(report.nonEmpty) {
+            // Get all candidates according to a criteria
+            val candidates = Criteria.check(report)
+
+            // Go through each candidate and check if we can apply a perturbation
+            val perturbation = candidates.map(c => Perturbation.check(c, report.get)).headOption
+
+            println("Applying no perturbations.")
+
+            perturbation
+        } else {
+            println("First iteration, applying no perturbations.")
+            None
+        }
     }
 
     def update(n: Int, config: ActorConfig): Unit = {
         val p = Paths.get(output, s"${test.hashCode}-${suite.hashCode}-$n.bin").toFile
 
         if(p.exists()) {
-            val report: TestReport = be.vub.soft.tracer.Tracer.read(p.getAbsolutePath)
+            if(report.isEmpty) {
+                report = Some(be.vub.soft.tracer.Tracer.read(p.getAbsolutePath))
+                compute()
+            } else {
+                results = results + (n -> PerturbationReport(config, report.get))
+            }
+            //reports = report :: reports
 
-            results = results + (n -> PerturbationReport(config, report.success))
+
 
         } else {
             println(s"Something went wrong... $p does not exists.")
@@ -32,9 +64,9 @@ class PerturbationAnalyzer(suite: String, test: String, output: String) extends 
 
     }
 
-    def report(): Unit = {
+    def summary(): Unit = {
         results.foreach({
-            case (k, v) => println(s"#$k -> ${v.succeeds}:\n${v.config}\n")
+            case (k, v) => println(s"#$k -> ${v.report.success}:\n${v.config}\n")
         })
 
     }

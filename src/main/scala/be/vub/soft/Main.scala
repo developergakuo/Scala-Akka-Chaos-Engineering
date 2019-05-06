@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 import java.util.Base64
 
-import be.vub.soft.parser.JSONParser
+import be.vub.soft.parser.{ActorConfig, JSONParser}
 import be.vub.soft.perturbation.analysis.{PerturbationAnalyzer, StaticAnalyzer}
 import be.vub.soft.reporter.DiscoveredTest
 import be.vub.soft.tracer.{PerturbationDelay, PerturbationDrop, PerturbationKill, TestReport}
@@ -116,11 +116,11 @@ object Main {
             Execute perturbations
          */
 
-        val countLogger = ProcessLogger(line => println(line), line => println(line))
+        val logger = ProcessLogger(line => println(line), line => println(line))
 
         if(!index.exists()) {
             val process = Process(Seq("sbt", s"discover $testClasses"), pwd)
-            process ! countLogger
+            process ! logger
         }
 
         if(index.exists()) {
@@ -137,6 +137,19 @@ object Main {
                     v.foreach(t => println(s"    ${t.name} (${t.succeeds})"))
             })
 
+
+            def execute(test: String, suite: String, n: Int, cmd: List[String], localConfigPath: String) = {
+                val process = Process(
+                    cmd ++ Seq("-s", suite, "-t", test),
+                    None,
+                    "PERTURBATION_CONFIGURATION" -> localConfigPath,
+                    "PERTURBATION_ITERATION" -> n.toString,
+                    "PERTURBATION_OUTPUT" -> output,
+                    "PERTURBATION_FORMAT" -> short.toString)
+
+                process ! logger
+            }
+
             for ((suite, tests) <- mapping) {
                 for(tuple <- tests) {
                     val DiscoveredTest(test, succeeded, cmd) = tuple
@@ -150,36 +163,40 @@ object Main {
                         val analyzer = new StaticAnalyzer(config, output)
                         //val analyzer = new PerturbationAnalyzer(suite, test, output)
 
-                        for(n <- 1 to iterations)
-                        {
-                            println(s"Iteration #$n: '$test' in $suite")
+                        val initial = execute(test, suite, 0, cmd, "")
 
-                            val localConfig = analyzer.next()
+                        if(initial == 0) {
+                            analyzer.update(0, ActorConfig())
 
-                            val localConfigPath = Paths.get(output, s"${test.hashCode}-${suite.hashCode}-$n-config.json").toFile.getAbsolutePath
-                            JSONParser.write(localConfigPath, localConfig)
+                            for (n <- 1 to iterations) {
+                                println(s"Iteration #$n: '$test' in $suite")
 
-                            //val encoded = Base64.getEncoder.encodeToString(test.getBytes(StandardCharsets.UTF_8))
-                            //val process = Process(Seq("sbt", s"perturb $testClasses $config $n $output $short $suite $encoded"), pwd)
-                            //val process = Process("sbt perturb" +: Seq(testClasses, config, n.toString, output, short.toString, suite, test), pwd)
-                            val process = Process(
-                                cmd ++ Seq("-s", suite, "-t", test),
-                                None,
-                                "PERTURBATION_CONFIGURATION" -> localConfigPath,
-                                "PERTURBATION_ITERATION" -> n.toString,
-                                "PERTURBATION_OUTPUT" -> output,
-                                "PERTURBATION_FORMAT" -> short.toString)
-                            //println(process.toString)
-                            val exit = process ! countLogger
+                                val localConfigOption = analyzer.next()
 
-                            if(exit == 0) {
-                                analyzer.update(n, localConfig)
-                            } else {
-                                println(s"Something went wrong... exit=$exit")
+                                if(localConfigOption.isDefined) {
+                                    val localConfig = localConfigOption.get
+
+                                    val localConfigPath = Paths.get(output, s"${test.hashCode}-${suite.hashCode}-$n-config.json").toFile.getAbsolutePath
+                                    JSONParser.write(localConfigPath, localConfig)
+
+                                    val exit = execute(test, suite, n, cmd, localConfigPath)
+
+                                    if (exit == 0) {
+                                        analyzer.update(n, localConfig)
+                                    } else {
+                                        println(s"Something went wrong... exit=$exit")
+                                    }
+                                } else {
+                                    println(s"Skipping $n: no perturbations left")
+                                }
                             }
+
+                            analyzer.summary()
+
+                        } else {
+                            println(s"Cancelling test: '$test' in $suite (initial trace failed: $initial)")
                         }
 
-                        analyzer.report()
                     } else {
                         println(s"Skipping failed test: '$test' in $suite")
                     }
