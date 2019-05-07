@@ -13,6 +13,9 @@ object Criteria {
 /*
     Criteria:
         ECA
+        ESM
+
+        We can combine those eg earliest messages of a given actor: ie custom calling ECA and then mappingg over it to get messagges
 
  */
 

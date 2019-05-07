@@ -6,8 +6,8 @@ import be.vub.soft.tracer.{PerturbationDelay, PerturbationDrop, PerturbationKill
 import org.apache.commons.io.FileUtils
 
 class StaticAnalyzer(configurationPath: String, output: String) extends Analyzer {
-    override def next(): Option[ActorConfig] = {
-        val result = JSONParser.load(configurationPath)
+    override def next(n: Int): Option[ActorConfig] = {
+        val result = JSONParser.load(configurationPath, n)
 
         println(result.head)
 

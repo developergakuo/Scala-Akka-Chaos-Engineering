@@ -52,7 +52,7 @@ object Main {
         /*
             Modifiable options
          */
-        val target          = "/Users/jonas/Downloads/webShop" // "/Users/jonas/phd/AkkaStreams" //
+        val target          = "/Users/jonas/Downloads/webShop" // "/Users/jonas/phd/AkkaStreams" // "/Users/jonas/phd/PersistentPerturbations" //
         val config          = Paths.get(target, "perturbation.json").toAbsolutePath.toString
         val testClasses     = Paths.get(target, "target", "scala-2.12", "test-classes").toAbsolutePath.toString
 
@@ -157,11 +157,13 @@ object Main {
                     // TODO: remove this is for debugging
                     val isTest = test.contains("send back a messages purchase completed")
 
-                    if(succeeded && isTest) {
+                    if(succeeded) { // && isTest) {
 
                         // static config:
                         val analyzer = new StaticAnalyzer(config, output)
                         //val analyzer = new PerturbationAnalyzer(suite, test, output)
+
+                        println("Running initial iteration")
 
                         val initial = execute(test, suite, 0, cmd, "")
 
@@ -171,7 +173,7 @@ object Main {
                             for (n <- 1 to iterations) {
                                 println(s"Iteration #$n: '$test' in $suite")
 
-                                val localConfigOption = analyzer.next()
+                                val localConfigOption = analyzer.next(n)
 
                                 if(localConfigOption.isDefined) {
                                     val localConfig = localConfigOption.get

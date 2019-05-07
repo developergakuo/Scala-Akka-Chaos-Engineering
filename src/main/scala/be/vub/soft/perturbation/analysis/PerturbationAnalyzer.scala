@@ -15,10 +15,11 @@ class PerturbationAnalyzer(suite: String, test: String, output: String) extends 
     var report: Option[TestReport] = None
     var perturbations: List[ActorConfig] = List(ActorConfig())
 
-    def next(): Option[ActorConfig] = {
+    def next(n: Int): Option[ActorConfig] = {
         val head = perturbations.headOption
 
         if(head.isDefined) {
+            //TODO: strategies run it until a perturbation was indeed applied (eg probability, or after message X but it might not always happpen)
             perturbations = perturbations.tail
 
             println(s"Next perturbation:\n$head")
@@ -33,11 +34,11 @@ class PerturbationAnalyzer(suite: String, test: String, output: String) extends 
             val candidates = Criteria.check(report)
 
             // Go through each candidate and check if we can apply a perturbation
-            val perturbation = candidates.map(c => Perturbation.check(c, report.get)).headOption
+            val candidatePerturbations = candidates.flatMap(c => Perturbation.check(c, report.get))
 
-            println("Applying no perturbations.")
+            // TODO: figure out all possible timings
 
-            perturbation
+            perturbations = candidatePerturbations
         } else {
             println("First iteration, applying no perturbations.")
             None
@@ -55,8 +56,6 @@ class PerturbationAnalyzer(suite: String, test: String, output: String) extends 
                 results = results + (n -> PerturbationReport(config, report.get))
             }
             //reports = report :: reports
-
-
 
         } else {
             println(s"Something went wrong... $p does not exists.")

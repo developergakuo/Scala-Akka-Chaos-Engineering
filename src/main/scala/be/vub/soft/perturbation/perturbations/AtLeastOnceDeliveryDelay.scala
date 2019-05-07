@@ -1,8 +1,12 @@
 package be.vub.soft.perturbation.perturbations
 
 import be.vub.soft.Constants
-import be.vub.soft.parser.ActorConfig
+import be.vub.soft.parser.{ActorConfig, ActorMessage}
 import be.vub.soft.tracer.{Send, TestReport, Traceable}
+
+/*
+    We simulate a delay by dropping a message, the ALOD mechanism will resend it after the timeout expired
+ */
 
 object AtLeastOnceDeliveryDelay extends Perturbation {
 
@@ -14,14 +18,26 @@ object AtLeastOnceDeliveryDelay extends Perturbation {
         case _ => false
     }
 
-    override def inject(perturbable: Traceable, report: TestReport): ActorConfig = {
+    override def inject(perturbable: Traceable, report: TestReport): ActorConfig = perturbable match {
+        case Send(spath, _, rpath, _, hash, clazz) =>
+            // Delay after Nth message
 
-        // Duplicate after Nth message
+            // Before sending it to actor X
 
-        // Before sending it to actor X
+            // After message X
 
-        // After message X
+            // TODO: how to combine these??
 
-        ActorConfig()
+            val actorName = rpath // Receiving actor
+            val senderName = spath
+            val delay = 0
+            val message = ActorMessage(clazz.r, 0.5, delay, senderName.r, ".*".r, ".*".r)
+            val messages = List(message)
+
+            val config = ActorConfig(actorName.r, ".*".r, ".*".r, 0.0, messages)
+
+            println(s"AtLeastOnceDeliveryDelay: $Send\n$config")
+
+            config
     }
 }
