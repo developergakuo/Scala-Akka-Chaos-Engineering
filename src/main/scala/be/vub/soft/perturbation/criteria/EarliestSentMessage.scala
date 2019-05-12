@@ -6,11 +6,13 @@ object EarliestSentMessage extends Criteria {
 
     override def compute(report: Option[TestReport]): List[Traceable] = report match {
         case Some(r) => {
-            val messages = r.trace.collect({
+            val result = r.trace.collect({
                 case a: Send if a.spath.contains("/user/") => a // TODO: filter system actors etc
-            })
-            //actors.sortBy(a => r.meta.values.find(meta => a.path.equals(meta.actorName)).map(_.timestamp).getOrElse(Long.MaxValue))
-            List.empty
+            }).sortBy(_.timestamp)
+
+            println(s"EarliestSentMessage:\n${result.mkString("\n")}")
+
+            result
         }
         case None => List.empty
     }

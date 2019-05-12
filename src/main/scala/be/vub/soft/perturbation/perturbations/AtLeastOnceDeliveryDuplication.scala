@@ -5,12 +5,13 @@ import be.vub.soft.tracer.{Send, TestReport, Traceable}
 object AtLeastOnceDeliveryDuplication extends Perturbation {
 
     override def pre(perturbable: Traceable, report: TestReport): Boolean = perturbable match {
-        case Send(spath, _, rpath, _, hash, clazz) if spath.contains("/user/") && rpath.contains("/user/") => true
+        case Send(spath, _, rpath, _, hash, clazz, _)
+            if spath.contains("/user/") && rpath.contains("/user/") && report.atLeastOnceDeliveryMessages.find(_.equals(clazz)).nonEmpty => true
         case _ => false
     }
 
-    override def inject(perturbable: Traceable, report: TestReport): ActorConfig = perturbable match {
-        case Send(spath, _, rpath, _, hash, clazz) =>
+    override def inject[Send](perturbable: Send, report: TestReport): ActorConfig = perturbable match {
+        case Send(spath, _, rpath, _, hash, clazz, _) =>
 
             // Duplicate after Nth message
 
@@ -23,7 +24,7 @@ object AtLeastOnceDeliveryDuplication extends Perturbation {
             val actorName = rpath // Receiving actor
 
             val senderName = spath
-            val message = ActorMessage(clazz.r, 0, 0, senderName.r, ".*".r, ".*".r)
+            val message = ActorMessage(clazz.r, 0, 1, 0, senderName.r, ".*".r, ".*".r)
             val messages = List(message)
             ActorConfig(actorName.r, ".*".r, ".*".r, 0.0, messages)
     }

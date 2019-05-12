@@ -8,7 +8,6 @@ import java.util.Base64
 import be.vub.soft.parser.{ActorConfig, JSONParser}
 import be.vub.soft.perturbation.analysis.{PerturbationAnalyzer, StaticAnalyzer}
 import be.vub.soft.reporter.DiscoveredTest
-import be.vub.soft.tracer.{PerturbationDelay, PerturbationDrop, PerturbationKill, TestReport}
 import org.apache.commons.io.FileUtils
 
 import scala.io.Source
@@ -23,7 +22,12 @@ import scala.sys.process.{Process, ProcessLogger}
         https://github.com/royrusso/akka-java-examples
 
 
-    TODO: store the final java command in the index -> speed up because no need for starting sbt and plugin!
+    TODO:
+        done: store the final java command in the index -> speed up because no need for starting sbt and plugin!
+        write a setak "whenStable" to avoid tests fail/timeout
+            thread.sleep will fail when actors are restarted/messagegs resend w/e (false positive)
+            timeouts in general might cause timeouts
+        gracefull tests whenDown(actor1) { assert(..) }
  */
 object Main {
 
@@ -52,7 +56,7 @@ object Main {
         /*
             Modifiable options
          */
-        val target          = "/Users/jonas/Downloads/webShop" // "/Users/jonas/phd/AkkaStreams" // "/Users/jonas/phd/PersistentPerturbations" //
+        val target          = "/Users/jonas/phd/ChaosEngineeringSurvey" // "/Users/jonas/phd/PersistentPerturbations" // "/Users/jonas/phd/AkkaStreams" // "/Users/jonas/phd/PersistentPerturbations" // "/Users/jonas/Downloads/web-shop"
         val config          = Paths.get(target, "perturbation.json").toAbsolutePath.toString
         val testClasses     = Paths.get(target, "target", "scala-2.12", "test-classes").toAbsolutePath.toString
 
@@ -137,8 +141,8 @@ object Main {
                     v.foreach(t => println(s"    ${t.name} (${t.succeeds})"))
             })
 
-
             def execute(test: String, suite: String, n: Int, cmd: List[String], localConfigPath: String) = {
+                println((cmd++ Seq("-s", suite, "-t", test)).mkString(" "))
                 val process = Process(
                     cmd ++ Seq("-s", suite, "-t", test),
                     None,
@@ -155,19 +159,21 @@ object Main {
                     val DiscoveredTest(test, succeeded, cmd) = tuple
 
                     // TODO: remove this is for debugging
-                    val isTest = test.contains("send back a messages purchase completed")
+                    val isTest = test.contains("ex1") && !test.contains("v2")
 
-                    if(succeeded) { // && isTest) {
+                    if(succeeded && isTest) {
 
                         // static config:
-                        val analyzer = new StaticAnalyzer(config, output)
-                        //val analyzer = new PerturbationAnalyzer(suite, test, output)
+                        //val analyzer = new StaticAnalyzer(config, output)
+                        val analyzer = new PerturbationAnalyzer(suite, test, output)
 
                         println("Running initial iteration")
 
                         val initial = execute(test, suite, 0, cmd, "")
 
                         if(initial == 0) {
+                            println("Initial iteration successful")
+
                             analyzer.update(0, ActorConfig())
 
                             for (n <- 1 to iterations) {
@@ -184,9 +190,10 @@ object Main {
                                     val exit = execute(test, suite, n, cmd, localConfigPath)
 
                                     if (exit == 0) {
+                                        println(s"Test succeeded... exit=$exit")
                                         analyzer.update(n, localConfig)
                                     } else {
-                                        println(s"Something went wrong... exit=$exit")
+                                        println(s"Test failed... exit=$exit")
                                     }
                                 } else {
                                     println(s"Skipping $n: no perturbations left")

@@ -5,10 +5,10 @@ import be.vub.soft.tracer.{Perturbable, TestReport, Traceable}
 
 object Perturbation {
 
-    val perturbations: List[Perturbation] = List(PersistentActorRestart, AtLeastOnceDeliveryDuplication, AtLeastOnceDeliveryDelay)
+    val perturbations: List[Perturbation] =  List(AtLeastOnceDeliveryDuplication) // List(PersistentActorRestart, AtLeastOnceDeliveryDuplication, AtLeastOnceDeliveryDelay)
 
     def check(traceable: Traceable, report: TestReport): List[ActorConfig] = {
-        perturbations.map({case p if p.pre(traceable, report) => p.inject(traceable, report) })
+        perturbations.collect({case p if p.pre(traceable, report) => p.inject(traceable, report) })
     }
 
 }
@@ -16,6 +16,6 @@ object Perturbation {
 abstract class Perturbation {
 
     def pre(perturbable: Traceable, report: TestReport): Boolean
-    def inject(perturbable: Traceable, report: TestReport): ActorConfig
+    def inject[A <: Traceable](perturbable: A, report: TestReport): ActorConfig
 
 }

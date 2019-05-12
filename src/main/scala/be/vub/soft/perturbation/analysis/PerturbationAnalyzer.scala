@@ -13,7 +13,7 @@ class PerturbationAnalyzer(suite: String, test: String, output: String) extends 
 
     var results: Map[Int, PerturbationReport] = Map.empty
     var report: Option[TestReport] = None
-    var perturbations: List[ActorConfig] = List(ActorConfig())
+    var perturbations: List[ActorConfig] = List(ActorConfig(),ActorConfig())
 
     def next(n: Int): Option[ActorConfig] = {
         val head = perturbations.headOption

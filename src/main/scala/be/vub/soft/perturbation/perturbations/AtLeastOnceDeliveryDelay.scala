@@ -11,15 +11,15 @@ import be.vub.soft.tracer.{Send, TestReport, Traceable}
 object AtLeastOnceDeliveryDelay extends Perturbation {
 
     override def pre(perturbable: Traceable, report: TestReport): Boolean = perturbable match {
-        case Send(spath, _, rpath, _, hash, clazz) if spath.contains("/user/") => // TODO:  && rpath.contains("/user/") ???
+        case Send(spath, _, rpath, _, hash, clazz, _) if spath.contains("/user/") => // TODO:  && rpath.contains("/user/") ???
             val senderUsesAtLeastOnceDelivery = report.meta.get(spath).exists(m => m.inheritance.contains(Constants.AtLeastOnceDelivery))
 
             senderUsesAtLeastOnceDelivery
         case _ => false
     }
 
-    override def inject(perturbable: Traceable, report: TestReport): ActorConfig = perturbable match {
-        case Send(spath, _, rpath, _, hash, clazz) =>
+    override def inject[Send](perturbable: Send, report: TestReport): ActorConfig = perturbable match {
+        case Send(spath, _, rpath, _, hash, clazz, _) =>
             // Delay after Nth message
 
             // Before sending it to actor X
@@ -28,9 +28,10 @@ object AtLeastOnceDeliveryDelay extends Perturbation {
 
             // TODO: how to combine these??
 
+
             val actorName = rpath // Receiving actor
             val senderName = spath
-            val delay = 0
+            val delay = 100
             val message = ActorMessage(clazz.r, 0.5, delay, senderName.r, ".*".r, ".*".r)
             val messages = List(message)
 

@@ -1,16 +1,13 @@
 package be.vub.soft.perturbation.criteria
-import be.vub.soft.tracer.{ActorStart, Perturbable, TestReport, Traceable}
+import be.vub.soft.tracer.{ActorRegistration, ActorStart, Perturbable, TestReport, Traceable}
 
 object EarliestCreatedActor extends Criteria {
 
     override def compute(report: Option[TestReport]): List[Traceable] = report match {
         case Some(r) =>
-            val actors = r.trace.collect({
-                case a: ActorStart if a.path.contains("/user/") => a // TODO: filter system actors etc
-            })
-            val result = actors.sortBy(a => r.meta.values.find(meta => a.path.equals(meta.actorName)).map(_.timestamp).getOrElse(Long.MaxValue))
+            val result = r.trace.collect({ case a: ActorRegistration if a.path.contains("/user/") => a }).sortBy(_.timestamp)
 
-            println(s"EarliestCreatedActor:\n$result")
+            println(s"EarliestCreatedActor:\n${result.mkString("\n")}")
 
             result
         case None =>
