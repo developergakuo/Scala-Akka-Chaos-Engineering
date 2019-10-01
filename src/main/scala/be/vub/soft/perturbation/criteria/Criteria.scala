@@ -4,7 +4,7 @@ import be.vub.soft.tracer.{TestReport, Traceable}
 
 object Criteria {
 
-    private val criteria: Criteria = EarliestSentMessage // EarliestCreatedActor
+    private val criteria: Criteria = DefaultCriteria // EarliestCreatedActor
 
     def check(report: Option[TestReport]): List[Traceable] = criteria.compute(report)
 

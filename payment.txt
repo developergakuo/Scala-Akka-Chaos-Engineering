@@ -1,0 +1,5 @@
+A Reactive Payment Processor must be able to process a valid order: actors=6 | types=6 (io.bernhardt.reactivepayment.Executor,io.bernhardt.reactivepayment.ReactivePaymentProcessor$ActorPaymentProcessor,io.bernhardt.reactivepayment.Merchant,io.bernhardt.reactivepayment.Validator,io.bernhardt.reactivepayment.BankConnection,io.bernhardt.reactivepayment.Client) 
+A WebshopActor actor must send back a messages purchase completed: actors=4 | types=4 (Shopping.WebShopActor,Shopping.StockActor,Shopping.PaymentsActor,Shopping.ClientActor) 
+A persistent actor must persist its state on restart: actors=4 | types=4 (Shopping.WebShopActor,Shopping.StockActor,Shopping.PaymentsActor,Shopping.ClientActor) 
+A WebshopActor actor2 must send back a messages purchase completed: actors=4 | types=4 (Shopping.WebShopActor,Shopping.StockActor,Shopping.PaymentsActor,Shopping.ClientActor) 
+A WebshopActor actor must send back a messages purchase completed: actors=4 | types=4 (Shopping.WebShopActor,Shopping.StockActor,Shopping.PaymentsActor,Shopping.ClientActor) 

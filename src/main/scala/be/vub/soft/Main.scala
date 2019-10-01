@@ -1,6 +1,6 @@
 package be.vub.soft
 
-import java.io.{File, FileInputStream, FileWriter, ObjectInputStream}
+import java.io.{File, FileInputStream, FileWriter, ObjectInputStream, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 import java.util.Base64
@@ -8,6 +8,7 @@ import java.util.Base64
 import be.vub.soft.parser.{ActorConfig, JSONParser}
 import be.vub.soft.perturbation.analysis.{PerturbationAnalyzer, StaticAnalyzer}
 import be.vub.soft.reporter.DiscoveredTest
+import be.vub.soft.tracer.{ActorRegistration, Send}
 import org.apache.commons.io.FileUtils
 
 import scala.io.Source
@@ -20,7 +21,7 @@ import scala.sys.process.{Process, ProcessLogger}
         https://doc.akka.io/docs/akka/current/actors.html#initialization-via-message-passing
         https://doc.akka.io/docs/akka/2.5/general/message-delivery-reliability.html
         https://github.com/royrusso/akka-java-examples
-
+        https://github.com/akka/akka/blob/master/akka-persistence/src/main/scala/akka/persistence/JournalProtocol.scala
 
     TODO:
         done: store the final java command in the index -> speed up because no need for starting sbt and plugin!
@@ -29,10 +30,34 @@ import scala.sys.process.{Process, ProcessLogger}
             timeouts in general might cause timeouts
         gracefull tests whenDown(actor1) { assert(..) }
  */
+/*
+load custom exceptions
+        // Create a new JavaClassLoader // Create a new JavaClassLoader
+        val classLoader = this.getClass.getClassLoader
+
+        // Load the target class using its binary name
+        val loadedMyClass = classLoader.loadClass("Shopping.Messages$RestartException")
+        val constructor = loadedMyClass.getConstructors
+        val myClassObject = constructor.head.newInstance("ok", new Throwable)
+        println("lol="+loadedMyClass.getFields.mkString(","))
+        System.out.println("Loaded class name: " + loadedMyClass.getName)
+ */
 object Main {
+
+    val Probability = 1
 
     def main(args: Array[String]): Unit =
     {
+        if(args.isEmpty) {
+            println("Missing argument: the path of the system to analyze")
+            System.exit(0)
+        } else if(args(0).contains(" ")) {
+            println("Target path cannot contain spaces")
+            System.exit(0)
+        } else {
+            println(s"Analyzing ${args(0)}")
+        }
+
         /*
         val cl = ProcessLogger(line => println(line), line => println(line))
         val cmd = List("java", "-javaagent:/Users/jonas/.ivy2/cache/org.aspectj/aspectjweaver/jars/aspectjweaver-1.8.10.jar", "-classpath",
@@ -47,177 +72,256 @@ object Main {
             "PERTURBATION_FORMAT" -> "false") ! cl
             */
 
+
+
+//        val projects = List("CESurvey-jens-results", "CESurvey-thierry-results","CESurvey-bjarno-results", "CESurvey-janwillem-results",
+//            "CESurvey-kevin-results", "CESurvey-maarten-results","CESurvey-tim-results", "CESurvey-quentin-results")
+//
+//        projects.foreach(p => {
+//            println(s"Analyzing $p")        }) //End foreach
+
+
         /*
             General options
          */
-        val short          = true // Debugging, true -> only message type, false -> complete message
-        val iterations      = 1
+        val short           = true // Debugging, true -> only message type, false -> complete message
+        val iterations      = 20
+        val skipTrace       = true
 
         /*
             Modifiable options
          */
-        val target          = "/Users/jonas/phd/ChaosEngineeringSurvey" // "/Users/jonas/phd/PersistentPerturbations" // "/Users/jonas/phd/AkkaStreams" // "/Users/jonas/phd/PersistentPerturbations" // "/Users/jonas/Downloads/web-shop"
+        /*
+        Modifiable options
+     */
+        val target          = "/Users/gakuo/Documents/ThesisProject/webshop"
         val config          = Paths.get(target, "perturbation.json").toAbsolutePath.toString
-        val testClasses     = Paths.get(target, "target", "scala-2.12", "test-classes").toAbsolutePath.toString
+        val testClasses     = Paths.get(target,    "target","scala-2.12","test-classes")
+          .toAbsolutePath.toString
 
-        /*
-            Should not be modified
-         */
-        val index           = Paths.get(target, "tests.index").toFile
-        val output          = Paths.get(target, "output").toAbsolutePath.toString
-        val pwd             = Paths.get(target).toFile
-        val lib             = Paths.get(target, "lib").toFile
-        val plugins         = Paths.get(target, "project", "plugins.sbt").toFile
-        val pluginPath      = Paths.get(target, "lib", "sbt-aspectj.jar")
-        val plugin          = s"""
-                                  |libraryDependencies += "org.aspectj" % "aspectjtools" % "1.8.10"
-                                  |addSbtPlugin("com.lightbend.sbt" % "sbt-aspectj" % "0.11.1" from "file://$pluginPath")
-                               """.stripMargin
+/*
+    Should not be modified
+ */
+val index           = Paths.get(target, "tests.index").toFile
+val output          = Paths.get(target, s"output-p-${100 * Probability}").toAbsolutePath.toString
+val out             = Paths.get(target, s"summary-p-${100 * Probability}").toAbsolutePath
+val pwd             = Paths.get(target).toFile
+val lib             = Paths.get(target, "lib").toFile
+val plugins         = Paths.get(target, "project", "plugins.sbt").toFile
+val pluginPath      = Paths.get(target, "lib", "sbt-aspectj.jar")
+val plugin          = s"""
+                          |libraryDependencies += "org.aspectj" % "aspectjtools" % "1.8.10"
+                          |addSbtPlugin("com.lightbend.sbt" % "sbt-aspectj" % "0.11.1" from "file://$pluginPath")
+                       """.stripMargin
 
-        println(s"Starting perturbation")
+println(s"Starting perturbation")
 
-        /*
-            Copy local jar files
-         */
+/*
+    Copy local jar files
+ */
 
-        println(s"Copying local jar files")
+println(s"Copying local jar files")
 
-        if(!lib.exists()) {
-            lib.mkdirs()
-        }
+if(!lib.exists()) {
+    lib.mkdirs()
+}
 
-        val jars = Paths.get("./jars").toFile
-        FileUtils.copyDirectory(jars, lib)
+val jars = Paths.get("./jars").toFile
+println(s"jars found: ${jars.exists()}")
+if(!jars.exists()) {
+    println("Missing jar files: they should be in the folder 'jars' located in the same folder as the tool.jar")
+    System.exit(0)
+}
+FileUtils.copyDirectory(jars, lib)
 
-        /*
-            Create output folder
-         */
+/*
+    Create output folder
+ */
 
-        val outputFile = new File(output)
-        if(!outputFile.exists()) {
-            outputFile.mkdirs()
-        }
+val outputFile = new File(output)
+if(!outputFile.exists()) {
+    outputFile.mkdirs()
+}
 
-        /*
-            Modify plugins.sbt
-         */
+/*
+    Modify plugins.sbt
+ */
 
-        println(s"Creating plugins.sbt")
+println(s"Creating plugins.sbt")
 
-        if(!plugins.exists()) {
-            plugins.createNewFile()
-        }
+if(!plugins.exists()) {
+    plugins.createNewFile()
+}
 
-        val file = Source.fromFile(plugins.getAbsolutePath)
-        val exists = file.getLines.exists(l => l.contains("sbt-aspectj"))
+val file = Source.fromFile(plugins.getAbsolutePath)
+val exists = file.getLines.exists(l => l.contains("sbt-aspectj"))
 
-        if(!exists) {
-            val fw = new FileWriter(plugins.getAbsolutePath, true)
-            try fw.write(plugin) finally fw.close()
-        }
+if(!exists) {
+    val fw = new FileWriter(plugins.getAbsolutePath, true)
+    try fw.write(plugin) finally fw.close()
+}
 
-        /*
-            Execute perturbations
-         */
+/*
+    Execute perturbations
+ */
 
-        val logger = ProcessLogger(line => println(line), line => println(line))
+val logger = ProcessLogger(line => println(line), line => println(line))
+//val logger = ProcessLogger(line => (), line => ())
 
-        if(!index.exists()) {
-            val process = Process(Seq("sbt", s"discover $testClasses"), pwd)
-            process ! logger
-        }
+if(!index.exists()) {
+    val process = Process(Seq("sbt", s"discover $testClasses"), pwd)
+    process ! logger
+}
 
-        if(index.exists()) {
-            println("Index file detected:")
+if(index.exists()) {
+    println("Index file detected:")
 
-            val f = new FileInputStream(index)
-            val s = new ObjectInputStream(f)
-            val mapping: Map[String, List[DiscoveredTest]] = s.readObject().asInstanceOf[Map[String, List[DiscoveredTest]]]
-            s.close()
+    val f = new FileInputStream(index)
+    val s = new ObjectInputStream(f)
+    val mapping: Map[String, List[DiscoveredTest]] = s.readObject().asInstanceOf[Map[String, List[DiscoveredTest]]]
+    s.close()
 
-            mapping.foreach({
-                case (k, v) =>
-                    println(k)
-                    v.foreach(t => println(s"    ${t.name} (${t.succeeds})"))
-            })
+    mapping.foreach({
+        case (k, v) =>
+            println(k)
+            v.foreach(t => println(s"    ${t.name} (${t.succeeds})"))
+    })
 
-            def execute(test: String, suite: String, n: Int, cmd: List[String], localConfigPath: String) = {
-                println((cmd++ Seq("-s", suite, "-t", test)).mkString(" "))
-                val process = Process(
-                    cmd ++ Seq("-s", suite, "-t", test),
-                    None,
-                    "PERTURBATION_CONFIGURATION" -> localConfigPath,
-                    "PERTURBATION_ITERATION" -> n.toString,
-                    "PERTURBATION_OUTPUT" -> output,
-                    "PERTURBATION_FORMAT" -> short.toString)
+    def execute(test: String, suite: String, n: Int, cmd: List[String], localConfigPath: String) = {
+        //println((cmd++ Seq("-s", suite, "-t", test)).mkString(" "))
+        val process = Process(
+            cmd ++ Seq("-s", suite, "-t", test),
+            None,
+            "PERTURBATION_CONFIGURATION" -> localConfigPath,
+            "PERTURBATION_ITERATION" -> n.toString,
+            "PERTURBATION_OUTPUT" -> output,
+            "PERTURBATION_FORMAT" -> short.toString,
+            "PERTURBATION_SKIP_TRACE" -> skipTrace.toString)
 
-                process ! logger
-            }
+        process ! logger
+    }
 
-            for ((suite, tests) <- mapping) {
-                for(tuple <- tests) {
-                    val DiscoveredTest(test, succeeded, cmd) = tuple
+    // For every test suite
+    for (((suite, tests), suiteID) <- mapping.zipWithIndex) {
 
-                    // TODO: remove this is for debugging
-                    val isTest = test.contains("ex1") && !test.contains("v2")
+        // For every test case
+        for((tuple, testID) <- tests.zipWithIndex) {
+            val DiscoveredTest(test, succeeded, cmd) = tuple
 
-                    if(succeeded && isTest) {
+            // TODO: remove this is for debugging
+            //val isTest = test.contains("sum all states correctly")
+            //val isTest = true // test.contains("A WebshopActor actor2")
+            val isTest = test.contains("send back a messages purchase completed")
+            if(succeeded && isTest) {
 
-                        // static config:
-                        //val analyzer = new StaticAnalyzer(config, output)
-                        val analyzer = new PerturbationAnalyzer(suite, test, output)
+                // static config:
+                //val analyzer = new StaticAnalyzer(config, output)
+                val analyzer = new PerturbationAnalyzer(suite, suiteID, test, testID, output)
 
-                        println("Running initial iteration")
+                println(s"Running initial iteration for '$test'")
 
-                        val initial = execute(test, suite, 0, cmd, "")
+                val initial = execute(test, suite, 0, cmd, "")
 
-                        if(initial == 0) {
-                            println("Initial iteration successful")
+                if(initial == 0) {
+                    println("Initial iteration successful")
 
-                            analyzer.update(0, ActorConfig())
+                    analyzer.update(0, ActorConfig())
 
-                            for (n <- 1 to iterations) {
-                                println(s"Iteration #$n: '$test' in $suite")
+                    if(analyzer.report.nonEmpty) {
+                        println(s"Analyzing trace of '$test'")
 
-                                val localConfigOption = analyzer.next(n)
-
-                                if(localConfigOption.isDefined) {
-                                    val localConfig = localConfigOption.get
-
-                                    val localConfigPath = Paths.get(output, s"${test.hashCode}-${suite.hashCode}-$n-config.json").toFile.getAbsolutePath
-                                    JSONParser.write(localConfigPath, localConfig)
-
-                                    val exit = execute(test, suite, n, cmd, localConfigPath)
-
-                                    if (exit == 0) {
-                                        println(s"Test succeeded... exit=$exit")
-                                        analyzer.update(n, localConfig)
-                                    } else {
-                                        println(s"Test failed... exit=$exit")
-                                    }
-                                } else {
-                                    println(s"Skipping $n: no perturbations left")
-                                }
+                        var graph = List.empty[String]
+                        def add(p: String, c: String) = graph = graph :+ s"${'"'}$p${'"'} -> ${'"'}$c${'"'}"
+                        var messages = Map.empty[(String, String, String), Int]
+                        def addMessage(s: String, r: String, c: String) = graph = graph :+ s"${'"'}$s${'"'} -> ${'"'}$r${'"'} [color=${'"'}0.002 0.999 0.999${'"'}, label=${'"'}$c${'"'}];"
+                        val all = false
+                        var actors = 0
+                        var setOfActorTypes = Set.empty[String]
+                        analyzer.report.get.trace.foreach({
+                            case s: Send => if(all || s.spath.contains("/user/") && s.rpath.contains("/user/") && !s.clazz.contains("akka.")) { //
+                                //val k = (s.spath + "#" + s.suid, s.rpath  + "#" + s.ruid, s.clazz)
+                                //val k = (s.spath + "#" + s.suid, s.rpath + "#" + s.suid, s.clazz)
+                                //println(s"Found message= ${s.clazz}")
+                                val k = (s.spath, s.rpath, s.clazz)
+                                val v = messages.getOrElse(k, 0) + 1
+                                messages = messages + (k -> v)
                             }
+                            case c: ActorRegistration => if(all || c.childPath.contains("/user/")) {
+                                add(c.parentPath, c.childPath)
+                                actors = actors + 1
+                                setOfActorTypes = setOfActorTypes + c.actorType
+//                                    val p = c.parentPath.indexOf("#")
+//                                    val cp = c.childPath.indexOf("#")
+//
+//                                    add(c.parentPath.substring(0, if(p == -1) p else c.parentPath.length -1),
+//                                        c.childPath.substring(0, if(cp == -1) cp else c.childPath.length -1))
+                            }
+                            case _ => ()
+                        })
+                        messages.foreach({ case (k,v) => addMessage(k._1, k._2, s"${k._3} ($v)")})
+/*
+                        val fw = new FileWriter("payment.txt", true)
+                        try {
+                            val s = s"$test: actors=$actors | types=${setOfActorTypes.size} (${setOfActorTypes.mkString(",")}) \n"
+                            println(s)
+                            fw.write(s)
+                        }
+                        finally fw.close()
+*/
+                        // dot -Tpdf graph.dot -o graph.pdf
+                        val gg = graph.mkString("\n")
+                        //new PrintWriter("./graph.dot") { write(s"digraph G { $gg }"); close }
 
-                            analyzer.summary()
+                        for (n <- 1 to iterations) {
+                            println(s"Iteration #$n: '$test' in $suite")
 
-                        } else {
-                            println(s"Cancelling test: '$test' in $suite (initial trace failed: $initial)")
+                            val localConfigOption = analyzer.next(n)
+
+                            if(localConfigOption.isDefined) {
+                                val localConfig = localConfigOption.get
+
+                                val localConfigPath = Paths.get(output, s"${test.hashCode}-${suite.hashCode}-$n-config.json").toFile.getAbsolutePath
+                                JSONParser.write(localConfigPath, localConfig)
+
+                                val exit = execute(test, suite, n, cmd, localConfigPath)
+
+                                if (exit == 0) {
+                                    println(s"Test succeeded... exit=$exit")
+                                } else {
+                                    println(s"Test failed... exit=$exit")
+                                }
+
+                                // Give it a bit of time to write to the file, probably unnecessary
+                                Thread.sleep(500)
+
+                                analyzer.update(n, localConfig)
+                            } else {
+                                println(s"Skipping $n: no perturbations left")
+                            }
                         }
 
+                        analyzer.summary(out)
+                        /**/
                     } else {
-                        println(s"Skipping failed test: '$test' in $suite")
+                        println(s"Unable to analyze trace of '$test'")
                     }
+
+                } else {
+                    println(s"Cancelling test: '$test' in $suite (initial trace failed: $initial)")
                 }
+
+            } else {
+                println(s"Skipping failed test: '$test' in $suite")
             }
-
-            println("Finished perturbation tests")
-
-        } else {
-            println("Unable to discover tests")
         }
-
     }
+
+    println("Finished perturbation tests")
+
+} else {
+    println("Unable to discover tests")
+}
+
+}
 
 }

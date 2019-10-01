@@ -1,5 +1,6 @@
 package be.vub.soft.perturbation.analysis
 import java.io.File
+import java.nio.file.Path
 
 import be.vub.soft.parser.{ActorConfig, JSONParser}
 import be.vub.soft.tracer.{PerturbationDelay, PerturbationDrop, PerturbationKill, TestReport}
@@ -18,7 +19,7 @@ class StaticAnalyzer(configurationPath: String, output: String) extends Analyzer
 
     }
 
-    override def summary(): Unit = {
+    override def summary(out: Path): Unit = {
         val report = new File(output)
 
         if(report.exists()) {

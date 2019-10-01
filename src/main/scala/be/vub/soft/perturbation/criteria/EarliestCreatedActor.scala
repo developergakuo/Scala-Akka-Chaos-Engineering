@@ -5,7 +5,7 @@ object EarliestCreatedActor extends Criteria {
 
     override def compute(report: Option[TestReport]): List[Traceable] = report match {
         case Some(r) =>
-            val result = r.trace.collect({ case a: ActorRegistration if a.path.contains("/user/") => a }).sortBy(_.timestamp)
+            val result = r.trace.collect({ case a: ActorRegistration if a.childPath.contains("/user/") => a }).sortBy(_.timestamp)
 
             println(s"EarliestCreatedActor:\n${result.mkString("\n")}")
 

@@ -1,0 +1,9 @@
+digraph G { "akka://WebshopTest/user/webShopActor" -> "akka://WebshopTest/user/webShopActor/stockChild"
+"akka://WebshopTest/user/webShopActor" -> "akka://WebshopTest/user/webShopActor/paymentsChild"
+"akka://WebshopTest/user/webShopActor" -> "akka://WebshopTest/user/webShopActor/clientChild"
+"akka://WebshopTest/user/webShopActor/clientChild" -> "akka://WebshopTest/user/webShopActor/stockChild" [color="0.002 0.999 0.999", label="Shopping.Messages$ReduceStock (1)"];
+"akka://WebshopTest/user/webShopActor/stockChild" -> "akka://WebshopTest/user/webShopActor/clientChild" [color="0.002 0.999 0.999", label="Shopping.Messages$GoodsConfirmed (1)"];
+"akka://WebshopTest/user/webShopActor/clientChild" -> "akka://WebshopTest/user/webShopActor" [color="0.002 0.999 0.999", label="Shopping.Messages$PurchaseCompleted (1)"];
+"akka://WebshopTest/user/webShopActor/paymentsChild" -> "akka://WebshopTest/user/webShopActor/clientChild" [color="0.002 0.999 0.999", label="Shopping.Messages$PaymentConfirmed (1)"];
+"akka://WebshopTest/user/webShopActor/clientChild" -> "akka://WebshopTest/user/webShopActor/paymentsChild" [color="0.002 0.999 0.999", label="Shopping.Messages$PaymentMessage (1)"];
+"akka://WebshopTest/user/webShopActor" -> "akka://WebshopTest/user/webShopActor/clientChild" [color="0.002 0.999 0.999", label="Shopping.Messages$BuyGoods (1)"]; }
